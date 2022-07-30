@@ -34,23 +34,56 @@ def get_all_users():
 
 @app.route('/user', methods=['POST'])
 def post_user():
-    user_data = request.json
-    new_user = User()
-    new_user.email = user_data['email']
-    new_user.password = user_data['password']
-    new_user.is_active = True
-    db.session.add(new_user)
+    try:
+        user_data = request.json
+        new_user = User()
+        new_user.email = user_data['email']
+        new_user.password = user_data['password']
+        new_user.is_active = True
+    except:
+        raise APIException('POST request must contain json containing keys and values for email and password.')
+    
+    try:
+        db.session.add(new_user)
+        db.session.commit()
+    except:
+        raise APIException('Email already exists')
+
+    serialized_users = [user.serialize() for user in User.query.all()]
+    return jsonify(serialized_users)
+    
+
+@app.route('/user/<int:id>', methods=['GET'])
+def get_user(id):
+    user = User.query.get(id)
+    if user == None:
+        raise APIException(f'Unable to locate user id: {id}')
+    return jsonify(user.serialize())
+
+@app.route('/user/<int:id>', methods=['DELETE'])
+def delete_user(id):
+    user = User.query.get(id)
+    if user == None:
+        raise APIException(f'Unable to locate user id: {id}')
+    db.session.delete(user)
     db.session.commit()
     serialized_users = [user.serialize() for user in User.query.all()]
     return jsonify(serialized_users)
 
-@app.route('/user/<int:id>', methods=['GET'])
-def get_user(id):
-    try: 
-        user = User.query.get(id)
-        return jsonify(user.serialize())
+@app.route('/user/<int:id>', methods=['PUT'])
+def update_user(id):
+    user = User.query.get(id)
+    if user == None:
+        raise APIException(f'Unable to locate user id: {id}')
+    user_data = request.json
+    user.email = user_data['email']
+    user.password = user_data['password']
+    user.is_active = True
+    try:
+        db.session.commit()
     except:
-        raise APIException(f'Unable to locate user: {id}')
+        raise APIException(f'The email {user_data["email"]} already exists')
+    return jsonify(user.serialize())
 
 if __name__ == '__main__':
     PORT = int(os.environ.get('PORT', 3000))
